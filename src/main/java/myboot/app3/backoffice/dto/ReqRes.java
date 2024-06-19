@@ -3,9 +3,13 @@ package myboot.app3.backoffice.dto;
 // requests and responses between the client and server
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
+import myboot.app3.backoffice.entity.BankAccount;
 import myboot.app3.backoffice.entity.User;
 
 import java.util.List;
@@ -38,6 +42,8 @@ public class ReqRes {
     private List<User> listUsers;
     private String temporaryPassword;
     private boolean mustChangePassword;
-    private Integer initialBalance;
+    private Long idType;
+    private Double accountBalance;
+    private String sms;
 
 }

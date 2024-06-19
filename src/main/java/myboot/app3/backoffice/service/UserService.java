@@ -2,7 +2,12 @@ package myboot.app3.backoffice.service;
 
 import myboot.app3.backoffice.Util.SMSGenerator;
 import myboot.app3.backoffice.dto.ReqRes;
+import myboot.app3.backoffice.entity.AccountType;
+import myboot.app3.backoffice.entity.BankAccount;
 import myboot.app3.backoffice.entity.User;
+import myboot.app3.backoffice.randomizer.Randomizer;
+import myboot.app3.backoffice.repository.AccountTypeRepo;
+import myboot.app3.backoffice.repository.BankAccountRepo;
 import myboot.app3.backoffice.repository.UserRepo;
 import myboot.app3.backoffice.Util.PasswordGenerator;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,13 +16,18 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
 public class UserService {
+
+    @Autowired
+    private CmiService cmiService;
 
     @Autowired
     private UserRepo userRepo;
@@ -38,6 +48,11 @@ public class UserService {
     private PasswordService passwordService;
     @Autowired
     private SmsService smsService;
+
+    @Autowired
+    private AccountTypeRepo accountTypeRepo;
+    @Autowired
+    private BankAccountRepo bankAccountRepo;
 
     public ReqRes register(ReqRes reqRes) {
         User user = new User();
@@ -69,19 +84,70 @@ public class UserService {
         }
         return reqRes;
     }
+    @Transactional
     public ReqRes createClient(ReqRes reqRes) {
+        ReqRes response = new ReqRes();
+
+        // Validate telephone and email
+        if (cmiService.telephoneExists(reqRes.getTel())) {
+            response.setStatusCode(400);
+            response.setMessage("Telephone number already exists.");
+            return response;
+        }
+
+        if (cmiService.emailExists(reqRes.getEmail())) {
+            response.setStatusCode(400);
+            response.setMessage("Email already exists.");
+            return response;
+        }
+
+        // Validate client number and email format
+        if (!cmiService.validateClientNum(reqRes.getTel())) {
+            response.setStatusCode(400);
+            response.setMessage("Invalid telephone number format.");
+            return response;
+        }
+
+        if (!cmiService.validateClientEmail(reqRes.getEmail())) {
+            response.setStatusCode(400);
+            response.setMessage("Invalid email format.");
+            return response;
+        }
+
+        if (reqRes.getAccountBalance() == null || cmiService.checkBalanceAccount(reqRes.getAccountBalance())) {
+            response.setStatusCode(400);
+            response.setMessage("Solde minimum est 200dh.");
+            return response;
+        }
+
+        AccountType accountType = accountTypeRepo.findById(reqRes.getIdType()).orElse(null);
+
+        if (accountType == null) {
+            response.setStatusCode(400);
+            response.setMessage("Erreur Type.");
+            return response;
+        }
+
+        if (reqRes.getAccountBalance() > accountType.getPlafond()) {
+            response.setStatusCode(400);
+            response.setMessage("Le solde inseresse dépasse le plafond.");
+            return response;
+        }
+
+        BankAccount bankAccount = new BankAccount(null, Randomizer.generateClientCompte(), reqRes.getAccountBalance());
+
+        bankAccountRepo.save(bankAccount);  // Save BankAccount first
+
         User user = new User();
         user.setFname(reqRes.getFname());
         user.setLname(reqRes.getLname());
         user.setEmail(reqRes.getEmail());
+        user.setAccountType(accountType);
+        user.setBankAccount(bankAccount);
         user.setRole(reqRes.getRole());
-        System.out.println(reqRes.getRole());
-
         user.setAddress(reqRes.getAddress());
         user.setTel(reqRes.getTel());
         user.setCin(reqRes.getCin());
-        user.setInitialBalance(reqRes.getInitialBalance());
-        System.out.println(reqRes.getInitialBalance());
         user.setMustChangePassword(true);
         String temporaryPassword = SMSGenerator.generateOTP();
         user.setPassword(passwordEncoder.encode(temporaryPassword));
@@ -96,7 +162,6 @@ public class UserService {
 
         return reqRes;
     }
-
 
 
     public ReqRes registerAdmin(ReqRes reqRes) {

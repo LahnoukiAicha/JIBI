@@ -1,5 +1,6 @@
 package myboot.app3.backoffice.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
@@ -31,8 +32,14 @@ public class User implements UserDetails {
     private String password;
     private String role;
     private boolean mustChangePassword;
-    private Integer initialBalance;
+    @OneToOne(cascade = CascadeType.ALL)
+    private BankAccount bankAccount;
+    @ManyToOne(fetch = FetchType.EAGER, targetEntity = AccountType.class)
+    private AccountType accountType;
 
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<Produit> produits;
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority(role)) ;
